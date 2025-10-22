@@ -4,17 +4,33 @@ from scripts.chroma import CreateChromaVecDB
 from scripts.embeddings import embeddings
 from scripts.chain import create_rag_chain
 from langchain_groq import ChatGroq
-import os
+from langchain_chroma import Chroma 
+from dotenv import load_dotenv
 from config import *
+import os
 
-print("Loading documents...")
-docs = DocsLoader(DataPath, FilesTypeGlob)
-chunks = Splitter.split_documents(docs)
-print(f"✓ Split {len(docs)} documents into {len(chunks)} chunks.")
+load_dotenv()
 
-print("Creating vector database...")
-chromadb = CreateChromaVecDB(chunks, embeddings)
-print(f"✓ Saved {len(chunks)} chunks to {ChromaPath}")
+if os.path.exists(ChromaPath) and os.listdir(ChromaPath):
+    print("✓ Loading existing vector database...")
+    chromadb = Chroma(
+        persist_directory=ChromaPath,
+        embedding_function=embeddings
+    )
+    try:
+        count = chromadb._collection.count()
+        print(f"✓ Loaded existing database with {count} chunks.")
+    except:
+        print(f"✓ Loaded existing database from {ChromaPath}")
+else:
+    print("Loading documents...")
+    docs = DocsLoader(DataPath, FilesTypeGlob)
+    chunks = Splitter.split_documents(docs)
+    print(f"✓ Split {len(docs)} documents into {len(chunks)} chunks.")
+    
+    print("Creating vector database...")
+    chromadb = CreateChromaVecDB(chunks, embeddings)
+    print(f"✓ Saved {len(chunks)} chunks to {ChromaPath}")
 
 retriever = chromadb.as_retriever(
     search_type="similarity",
@@ -23,7 +39,7 @@ retriever = chromadb.as_retriever(
 
 print("Loading LLM...")
 llm = ChatGroq(
-	model="llama-3.3-70b-versatile",
+    model="llama-3.3-70b-versatile",
     temperature=0
 )
 
